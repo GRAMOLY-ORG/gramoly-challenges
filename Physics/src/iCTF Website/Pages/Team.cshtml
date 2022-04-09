@@ -1,0 +1,151 @@
+﻿@page "{id:int}"
+@model iCTF_Website.Pages.TeamModel
+
+@using Microsoft.Extensions.Configuration;
+@using iCTF_Shared_Resources.Managers
+@inject IConfiguration configuration;
+
+@{
+    ViewData["Title"] = Model.Team.Name;
+}
+
+<div class="container mb-3">
+    <h2 class="m-3">
+        @Model.Team.Name - @Model.TeamStats.Score points
+        @if (Model.TeamStats.Score > 0)
+        {
+            @:(@Model.TeamStats.Position / @Model.TeamStats.PlayersCount)
+        }
+    </h2>
+    <hr />
+    @if (Model.FirstChallengeReleaseDate != default(DateTime))
+    {
+        <div>
+            <canvas id="chart" width="50" height="200"></canvas>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.4.1/dist/chart.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/moment@2.27.0"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@0.1.1"></script>
+        <script>
+                var ctx = document.getElementById('chart').getContext('2d');
+                var myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: "Score",
+                                borderColor: "#3db6f2",
+                                backgroundColor: "#3db6f2",
+                                data: [
+                                    { x: moment("@(Model.FirstChallengeReleaseDate.ToString("o") + "Z")"), y: 0 },
+                                @{ int score = 0; }
+                                @foreach (var solve in Model.Team.Solves)
+                                {
+                                    score += configuration.GetValue<bool>("DynamicScoring") 
+                                            ? DynamicScoringManager.GetPointsFromSolvesCount(Model.TeamStats.SolvedChallenges.First(x => x.Challenge == solve.Challenge).SolvesCount)
+                                            : solve.Challenge.Points;
+                                    @:{ x: moment("@(solve.SolvedAt.ToString("o") + "Z")"), y: @score },
+                                }
+                                    { x: moment(), y: @score },
+                                ]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    tooltipFormat: 'DD/MM - HH:mm'
+                                },
+                            },
+                        },
+                    }
+                });
+        </script>
+    }
+    <div class="row mt-2">
+        <div class="col-md-6">
+            <h4>Solved Challenges</h4>
+            @if (Model.Team.Solves.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-light table-bordered">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Challenge</th>
+                                <th>Points</th>
+                                <th>Solved At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var solve in Model.Team.Solves.OrderByDescending(x => x.SolvedAt))
+                            {
+                                <tr>
+                                    <td>@solve.Challenge.Title</td>
+                                    <td>@(configuration.GetValue<bool>("DynamicScoring") 
+                                            ? DynamicScoringManager.GetPointsFromSolvesCount(Model.TeamStats.SolvedChallenges.First(x => x.Challenge == solve.Challenge).SolvesCount)
+                                            : solve.Challenge.Points)</td>
+                                    <td>
+                                    <script>document.write(moment("@(solve.SolvedAt.ToString("o") + "Z")").format('DD/MM HH:mm:ss'))</script></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p>Looks like this team hasn't solved any challenges yet :'(</p>
+            }
+        </div>
+        <div class="col-md-6">
+            <h4>Unsolved Challenges</h4>
+            @if (Model.TeamStats.UnsolvedChallenges.Count > 0)
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-light table-bordered">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Challenge</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var chall in Model.TeamStats.UnsolvedChallenges)
+                            {
+                                <tr>
+                                    <td>@chall.Challenge.Title</td>
+                                    <td>
+                                        @(configuration.GetValue<bool>("DynamicScoring") 
+                                            ? DynamicScoringManager.GetPointsFromSolvesCount(chall.SolvesCount)
+                                            : chall.Challenge.Points)
+                                        </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p>Looks like this team has solved all the currently released challenges :)</p>
+            }
+        </div>
+    </div>
+    <div class="text-start">
+        <h4>Team Members</h4>
+        <ul>
+            @foreach (var member in Model.Team.Members)
+            {
+                <li><a class="text-decoration-none gray-text cool-link fw-bold" href="/User/@member.Id">
+                    @(member.WebsiteUser?.UserName ?? member.DiscordUsername)</a> - 
+                    @(configuration.GetValue<bool>("DynamicScoring") ?
+                    Model.Team.Solves.Where(x => x.User == member).Sum(x => DynamicScoringManager.GetPointsFromSolvesCount(Model.TeamStats.SolvedChallenges.First(y => y.Challenge == x.Challenge).SolvesCount)) : 
+                    Model.Team.Solves.Where(x => x.User == member).Sum(x => x.Challenge.Points)) points</li>
+            }
+        </ul>
+    </div>
+</div>

@@ -1,0 +1,31 @@
+﻿@page
+@model iCTF_Website.Pages.SolvesModel
+
+@{
+    ViewData["Title"] = "Solves";
+}
+
+<div class="container mb-3">
+    <h1 class="text-center m-3">Solves</h1>
+    <ul class="list-group">
+        @if (Model.Solves.Count == 0) {
+            <p>Looks like no challenges have been solved yet :'(</p>
+        }
+        @foreach (Solve solve in Model.Solves)
+        {
+            <li class="list-group-item">
+                <script>
+                    var date = new Date("@(solve.SolvedAt.ToString("o") + "Z")");
+                    document.write(date.toISOString().substring(0, 19).replace("T", " ").replaceAll("-", "/"));
+                </script> -
+                <a class="text-decoration-none gray-text cool-link fw-bold" href="/User/@solve.User.Id">@(solve.User.WebsiteUser?.UserName ?? solve.User.DiscordUsername)</a>
+                @if (solve.Team != null)
+                {
+                    @:(team <a class="text-decoration-none gray-text cool-link fw-bold" href="/Team/@solve.Team.Id">@solve.Team.Name</a>)
+                }
+                solved
+                <b>@solve.Challenge.Title</b>
+            </li>
+        }
+    </ul>
+</div>

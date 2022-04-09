@@ -1,0 +1,62 @@
+﻿@using Microsoft.AspNetCore.Identity
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+
+<nav class="navbar navbar-dark sticky-top p-0 text-center">
+    <div class="w-100 bg-logo p-2">
+        <a class="text-decoration-none" href="/">
+            <div class="navbar-brand float-start ms-2">
+                <img src="https://gramoly.org/static/images/GRAMOLY.svg" height="40" class="d-inline-block align-middle logo-img" alt="GRAMOLY">
+            </div>
+            <span class="logo-text text-white">GRAMOLY Challenges</span>
+        </a>
+        <button class="navbar-toggler sidenav-toggler float-end m-1" type="button">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+    <div class="menu sidenav bg-darker-smooth" style="transform: translate(100%)">
+        <ul class="navbar-nav p-2 pl-1 pr-1 big-rounded">
+            <li class="nav-item menu-item mt-1 border-bottom border-2 text-nowrap">
+                <a class="nav-link menu-link" href="/">Home Page</a>
+            </li>
+            <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                <a class="nav-link menu-link" asp-page="Challenges">Challenges</a>
+            </li>
+            <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                <a class="nav-link menu-link" asp-page="Leaderboard">Leaderboard</a>
+            </li>
+            <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                <a class="nav-link menu-link" asp-page="Solves">Solves</a>
+            </li>
+            <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                <a class="nav-link menu-link" asp-page="ArchivedChallenges">Archived Challenges</a>
+            </li>
+            @if (SignInManager.IsSignedIn(User))
+            {
+                @if (User.IsInRole("Administrator"))
+                {
+                    <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                        <a class="nav-link menu-link" asp-area="Admin" asp-page="Index">Admin Panel</a>
+                    </li>
+                }
+                <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                    <a class="nav-link menu-link" asp-area="Account" asp-page="Index">Account</a>
+                </li>
+                <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                    <form asp-page="Logout" asp-route-returnUrl="@Url.Page("/", new { area = "" })" class="d-inline-block" method="post">
+                        <a onclick="this.closest('form').submit();return false;" class="nav-link menu-link" asp-page="Logout">Logout</a>
+                    </form>
+                </li>
+            }
+            else
+            {
+                <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                    <a class="nav-link menu-link" asp-page="Register">Register</a>
+                </li>
+                <li class="nav-item menu-item mt-2 border-bottom border-2 text-nowrap">
+                    <a class="nav-link menu-link d-inline-block" asp-page="Login">Login</a>
+                </li>
+            }
+        </ul>
+    </div>
+</nav>

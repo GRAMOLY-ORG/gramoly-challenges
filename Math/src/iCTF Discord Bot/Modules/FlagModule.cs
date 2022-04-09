@@ -1,0 +1,159 @@
+﻿using Discord;
+using Discord.Commands;
+using Discord.WebSocket;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Tasks;
+using System.Linq;
+using iCTF_Discord_Bot.Managers;
+using iCTF_Shared_Resources;
+using iCTF_Shared_Resources.Models;
+using iCTF_Shared_Resources.Managers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+
+namespace iCTF_Discord_Bot.Modules
+{
+    [Name("answer")]
+    public class FlagModule : ModuleBase<SocketCommandContext>
+    {
+        private readonly DiscordSocketClient _client;
+        private readonly CommandService _commands;
+        private readonly DatabaseContext _context;
+        private readonly IServiceScope _scope;
+        private readonly IConfigurationRoot _configuration;
+
+        public FlagModule(DiscordSocketClient client, CommandService commands, IServiceScopeFactory scopeFactory)
+        {
+            _client = client;
+            _commands = commands;
+            _scope = scopeFactory.CreateScope();
+            _context = _scope.ServiceProvider.GetService<DatabaseContext>();
+            _configuration = _scope.ServiceProvider.GetService<IConfigurationRoot>();
+        }
+
+        ~FlagModule() { _scope.Dispose(); }
+
+        [Command("answer")]
+        [RequireContext(ContextType.DM)]
+        [Summary("Submits an answer")]
+        public async Task Flag(string answer)
+        {
+            var challenge = await SharedFlagManager.GetChallByFlag(_context, answer, includeArchived: true);
+            var config = await _context.Configuration.AsQueryable().FirstOrDefaultAsync();
+            if (config != null && config.IsFinished)
+            {
+                await ReplyAsync("The competition is already over.");
+                return;
+            }
+
+            if (challenge == null)
+            {
+                await ReplyAsync("Your answer is incorrect.");
+                if (config != null && config.GuildId != 0 && config.LogsChannelId != 0)
+                {
+                    var logsChannel = _client.GetGuild(config.GuildId).GetTextChannel(config.LogsChannelId);
+                    await logsChannel.SendMessageAsync($"<@{Context.User.Id}> submitted a wrong answer: **{Format.Sanitize(answer).Replace("@", "@\u200B")}**");
+                }
+                return;
+            }
+
+            if (challenge.State == 3) {
+                await ReplyAsync("You are trying to submit an answer for an archived challenge.");
+                if (config != null && config.GuildId != 0 && config.LogsChannelId != 0) {
+                    var logsChannel = _client.GetGuild(config.GuildId).GetTextChannel(config.LogsChannelId);
+                    await logsChannel.SendMessageAsync($"<@{Context.User.Id}> submitted an answer for an archived challenge: **{Format.Sanitize(answer).Replace("@", "@\u200B")}**");
+                }
+                return;
+            }
+
+            var user = await UserManager.GetOrCreateUser(_context, Context.User.Id, Context.User.ToString());
+
+            bool isTeam = (user.Team != null);
+
+            if ((!isTeam && user.Solves.Select(x => x.Challenge).Contains(challenge)) || (isTeam && user.Team.Solves.Select(x => x.Challenge).Contains(challenge)))
+            {
+                await ReplyAsync("You already solved that challenge!");
+                return;
+            }
+			
+            if (config != null && config.GuildId != 0 && config.TodaysRoleId != 0)
+            {
+                var lastChall = await _context.Challenges.AsQueryable().OrderByDescending(x => x.ReleaseDate).FirstOrDefaultAsync(x => x.State == 2);
+                if (lastChall == challenge)
+                {
+                    if (isTeam)
+                    {
+                        foreach (var member in user.Team.Members)
+                        {
+                            if (member.DiscordId == 0) continue;
+                            var guildUser = _client.GetGuild(config.GuildId).GetUser(member.DiscordId);
+                            if (guildUser != null)
+                            {
+                                var role = _client.GetGuild(config.GuildId).GetRole(config.TodaysRoleId);
+                                await guildUser.AddRoleAsync(role);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var guildUser = _client.GetGuild(config.GuildId).GetUser(Context.User.Id);
+                        if (guildUser != null)
+                        {
+                            var role = _client.GetGuild(config.GuildId).GetRole(config.TodaysRoleId);
+                            await guildUser.AddRoleAsync(role);
+                        }
+                    }
+                }
+            }
+
+            if (isTeam)
+            {
+                user.Team.LastUpdated = DateTime.UtcNow;
+            }
+            else
+            {
+                user.LastUpdated = DateTime.UtcNow;
+            }
+
+            var solve = new Solve
+            {
+                User = user,
+                Team = user.Team,
+                Challenge = challenge,
+                SolvedAt = DateTime.UtcNow,
+                Announced = true
+            };
+
+            await _context.Solves.AddAsync(solve);
+            await _context.SaveChangesAsync();
+            await ReplyAsync($"Congratulations! You solved **{challenge.Title}** challenge!");
+
+            bool dynamicScoring = _configuration.GetValue<bool>("DynamicScoring");
+            await SolvesManager.AnnounceWebsiteSolves(_client, _context, dynamicScoring);
+            await SolvesManager.AnnounceSolve(_client, _context, challenge, user);
+            await LeaderboardManager.UpdateLeaderboard(_client, _context, dynamicScoring);
+            await RolesManager.UpdateRoles(_client, _context);
+        }
+
+        [Command("verify")]
+        [RequireContext(ContextType.Guild)]
+        [RequireUserPermission(GuildPermission.ManageGuild, Group = "Permission")]
+        [RequireOwner(Group = "Permission")]
+        [Summary("Verifies an answer without submitting it")]
+        public async Task Verify(string answer)
+        {
+            Challenge chall = await SharedFlagManager.GetChallByFlag(_context, answer);
+            if (chall == null)
+            {
+                await ReplyAsync("Your answer is incorrect.");
+            }
+            else
+            {
+                await ReplyAsync($"Your answer for **{chall.Title}** is correct.");
+            }
+        }
+    }
+}
