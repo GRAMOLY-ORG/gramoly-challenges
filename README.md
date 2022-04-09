@@ -60,4 +60,4 @@ username: `admin`
 password: `Admin123!`
 
 
-> **Note:** This platform is a fork of [@Et3rnos](https://github.com/Et3rnos/)'s [ImaginaryCTF](https://github.com/Et3rnos/ImaginaryCTF) but modified to fullfill GRAMOLY's needs.
+> **Note:** This platform is a fork of [@Et3rnos](https://github.com/Et3rnos/)'s [ImaginaryCTF](https://github.com/Et3rnos/ImaginaryCTF) but modified to fulfill GRAMOLY's needs.
