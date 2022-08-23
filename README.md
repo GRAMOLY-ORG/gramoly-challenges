@@ -25,7 +25,7 @@ If you are planning to use the full version of this app you will need access to:
 #### Clone GRAMOLY Challenges
 
 ```
-git clone https://github.com/TheBlapse/gramoly-challenges
+git clone https://github.com/GRAMOLY-ORG/gramoly-challenges
 ```
 
 #### Install .NET Core SDK 6.0
